@@ -31,3 +31,34 @@ can apply bytes in order, but maybe this is bad and the offset should always be 
 I like the class solution better
 - because it's prabably annoying to manage the buffer size
 - should maybe try the other solution later
+
+
+
+###
+
+
+define a bunch of different types of waves
+- sin wave
+- square wave
+
+find out how to combine different types of waves
+
+create a json parser
+```json
+{
+    "durationMs": 5000,
+    "sampleRate": 44100,
+    "channels": 1,
+    "waves": [
+        {
+            "square": {
+                "frequency": 100,
+            }
+        }
+    ]
+}
+```
+
+
+create a wav file visualizer
+
