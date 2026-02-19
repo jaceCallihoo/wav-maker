@@ -46,15 +46,21 @@ find out how to combine different types of waves
 create a json parser
 ```json
 {
-    "durationMs": 5000,
-    "sampleRate": 44100,
-    "channels": 1,
+    "durationMs": 5000,     // optional
+    "sampleRate": 44100,    // required (all waves should be the same for now) also maybe should have a default
+    "bitsPerSample": 16,    // maybe this should have a default later
+    "channels": 1,          // default 1
     "waves": [
         {
-            "square": {
-                "frequency": 100,
-            }
-        }
+            "type": "square",
+            "frequency": 100,
+            "amplitude": 16000
+        },
+        {
+            "type": "sin",
+            "frequency": 100,
+            "amplitude": 16000
+        },
     ]
 }
 ```

@@ -5,6 +5,12 @@
 #include <cstdint>
 #include <array>
 #include <span>
+#include <cmath>
+#include <numbers>
+#include <cassert>
+#include <algorithm>
+
+#define assertm(exp, msg) assert((void(msg), exp))
 
 // TODO: shoulde the function names be camel case? Check google formatting standards
 // TODO: check the class field names as well
@@ -25,6 +31,20 @@ void writeHelper(std::span<const std::uint8_t> value, std::size_t offset, std::v
 
     std::copy(value.begin(), value.end(), bytes.begin() + offset);
 }
+
+// TODO: fix this so the input does not need to be converted into a span
+template <typename T>
+std::vector<std::uint8_t> allToLittleEndian(std::span<T> values) {
+    std::vector<std::uint8_t> bytes(values.size() * sizeof(T));
+
+    for (std::size_t i = 0; i < values.size(); i++) {
+        size_t offset = i * sizeof(T);
+        writeHelper(toLittleEndian(values[i]), offset, bytes);
+    }
+
+    return bytes;
+}
+
 
 class Wav {
     const static std::size_t offsetChunkId = 0;
@@ -99,38 +119,27 @@ public:
 
 // sampleRate: how many samples of the wave are there in a seccond
 // bitsPerSample: how many bits are used to record a sample
-//
+// frequency: number of sound wave cycels per second
+//      1Hz = 1 cycle per second
+// apmlitude: distance of the wave sample from 0
 
-
+// TODO: can this returen an array somehow instead of a vector?
+// TODO: make a generator version of this function
+// TODO: make a stateless version of this function that gets a saple at a given index
 template <typename T>
-std::vector<std::uint8_t> allToLittleEndian(std::span<T> values) {
-    std::vector<std::uint8_t> bytes(values.size() * sizeof(T));
+std::vector<T> squareWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+    assert(durationMs > 0);
+    assert(sampleRate > 0);
+    assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
+    assert(frequency > 0);
+    assert(sizeof(amplitude) == bitsPerSample / 8);
 
-    for (std::size_t i = 0; i < values.size(); i++) {
-        size_t offset = i * sizeof(T);
-        writeHelper(values[i], offset, bytes);
-    }
-
-    return bytes;
-}
-
-// maybe this should return a std::int16_t instead of a std::uint8_t, it should be converted to little endian later
-std::vector<std::uint8_t> squareWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, std::int16_t high, std::int16_t low) {
-    // assert frequency > 0
-    // assert cycleDuration > 0
-    // assert duration >= 0
-    // assert sampleRate >= 0
-    // assert bitsPerSample >= 8 && bitsPerSample % 8 == 0
-    // assert high <= 2^(bitsPerSample - 1) - 1 && low >= -2^(bitsPerSample - 1)
-    // assert bistPerSample / 8 == sizeof(high) && bitsPerSample / 8 == sizeof(low)
-
-    const int bytesPerSample = bitsPerSample / 8;
-    const int numSamples = (durationMs * sampleRate) / 1000;
+    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
     const int cycleDuration = sampleRate / frequency;
     int cycleCount = 0;
     bool isHigh = true;
 
-    std::vector<std::uint8_t> sound(numSamples * bytesPerSample);
+    std::vector<T> samples(numSamples);
 
     for (std::size_t i = 0; i < numSamples; i++) {
         if (!(cycleCount < cycleDuration)) {
@@ -139,57 +148,43 @@ std::vector<std::uint8_t> squareWave(int durationMs, int sampleRate, int bitsPer
         }
         cycleCount++;
 
-        const std::size_t offset = i * bytesPerSample;
-        writeHelper(toLittleEndian(isHigh ? high : low), offset, sound);
+        samples[i] = isHigh ? amplitude : -amplitude;
     }
 
-    return sound;
+    return samples;
 }
 
-// need to take in the sample rate, or do I? yes becaues theyre signed i think 
-std::vector<std::uint8_t> addWaves(std::vector<std::uint8_t> a, std::vector<std::uint8_t> b) {
-    // assert a.size() == b.size()
+// template <typename T>
+// std::vector<T> sawtoothWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+// }
+// 
+// template <typename T>
+// std::vector<T> pulseWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+// }
+// 
+// template <typename T>
+// std::vector<T> triangleWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+// }
 
+template <typename T>
+std::vector<T> sinWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+    assert(durationMs > 0);
+    assert(sampleRate > 0);
+    assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
+    assert(frequency > 0);
+    assert(sizeof(amplitude) == bitsPerSample / 8);
 
-}
+    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
 
-std::vector<std::uint8_t> createSound(int numChannels, int sampleRate, int bitsPerSample) {
-    const int durationSeconds = 1;
-    const std::int16_t up = 16383;
-    const std::int16_t down = -16383;
+    std::vector<T> samples(numSamples);
 
-    std::vector<std::uint8_t> sound(durationSeconds * sampleRate * bitsPerSample / 8);
-
-    bool isUp = true;
-    // bool mod = true;
-    for (int i = 0; i < durationSeconds * sampleRate; i++) {
-        if (i % 100 == 0) {
-            isUp = !isUp;
-        }
-
-        std::int16_t sample;
-        if (isUp) {
-            sample = up;
-        } else {
-            sample = down;
-        }
-
-        /*
-        if (i % 300 == 0) {
-            mod = !mod;
-        }
-
-        if (mod) {
-            sample = sample / 2;
-        }
-        */
-
-        auto serializedSample = toLittleEndian(sample);
-        const size_t offset = i * bitsPerSample / 8;
-        writeHelper(serializedSample, offset, sound);
+    for (std::size_t i = 0; i < numSamples; i++) {
+        const double x = double(i) / sampleRate;
+        const T sample = std::sin(2 * std::numbers::pi * frequency * x) * amplitude;
+        samples[i] = sample;
     }
 
-    return sound;
+    return samples;
 }
 
 int main() {
@@ -205,19 +200,27 @@ int main() {
     // create sound with input values
     // std::vector<std::uint8_t> data = createSound(numChannels, sampleRate, bitsPerSample);
     // create wav file with input values
-    std::vector<std::uint8_t> data = squareWave(2000, sampleRate, bitsPerSample, 440, 16383, -16383);
+    const int durationMs = 2000;
+    const int frequency = 440;
+    const std::int16_t amplitude = 16383;
+
+    std::vector<std::int16_t> squareSamples = squareWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
+    std::vector<std::int16_t> sinSamples = sinWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
+
+    std::vector<std::int16_t> samples(squareSamples.size());
+
+    std::transform(squareSamples.begin(), squareSamples.end(), sinSamples.begin(), samples.begin(), [](std::int16_t x, std::int16_t y) {
+                return (x / 2 + y / 2) + ((x % 2 + y % 2) / 2);
+            });
+
+    std::vector<std::uint8_t> data = allToLittleEndian(std::span<std::int16_t>{samples});
 
     Wav wave(numChannels, sampleRate, bitsPerSample, data);
 
-
     std::vector<std::uint8_t> buffer = wave.toBytes();
-
 
     //////////////////////////////////////////////////////////////////////
     // write to file
-
-    // std::vector<std::uint8_t> buffer;
-    // buffer.insert(buffer.end(), {'R','I','F','F'});
 
     std::ofstream file("output.wav", std::ios::binary);
     if (!file) {
