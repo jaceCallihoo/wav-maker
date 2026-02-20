@@ -9,6 +9,7 @@
 #include <numbers>
 #include <cassert>
 #include <algorithm>
+#include <format>
 
 #define assertm(exp, msg) assert((void(msg), exp))
 
@@ -19,7 +20,7 @@ template <typename T>
 constexpr std::array<uint8_t, sizeof(T)> toLittleEndian(T value) {
     std::array<uint8_t, sizeof(T)> out{};
     for (size_t i = 0; i < sizeof(T); ++i) {
-        out[i] = static_cast<char>((value >> (8 * i)) & 0xFF);
+        out[i] = static_cast<uint8_t>((value >> (8 * i)) & 0xFF);
     }
     return out;
 }
@@ -117,17 +118,32 @@ public:
     }
 };
 
+// bitsPerSample: how many bits are used to record a sample (not important until later when writing)
+// apmlitude: distance of the wave sample from 0 (also not super important to the calc)
+
 // sampleRate: how many samples of the wave are there in a seccond
-// bitsPerSample: how many bits are used to record a sample
 // frequency: number of sound wave cycels per second
 //      1Hz = 1 cycle per second
-// apmlitude: distance of the wave sample from 0
+// wavelength: 
+// waves per second? -> how many waves have been before this point?
+//      frequency 
+
+// i: the current sample
+// double(i) / sampleRate: position within the second ... is this even useful? don't we want position within the wave?
+//      maybe this is useful when combined with frequency
+// period: 1 / frequency
 
 // TODO: can this returen an array somehow instead of a vector?
 // TODO: make a generator version of this function
 // TODO: make a stateless version of this function that gets a saple at a given index
+
+// TODO: maybe make this later, or find a way to modify the square wave maybe? Maybe have a translation
+// template <typename T>
+// std::vector<T> pulseWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+// }
+
 template <typename T>
-std::vector<T> squareWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+std::vector<T> sawtoothWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
     assert(durationMs > 0);
     assert(sampleRate > 0);
     assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
@@ -135,36 +151,52 @@ std::vector<T> squareWave(int durationMs, int sampleRate, int bitsPerSample, int
     assert(sizeof(amplitude) == bitsPerSample / 8);
 
     const std::size_t numSamples = (durationMs * sampleRate) / 1000;
-    const int cycleDuration = sampleRate / frequency;
-    int cycleCount = 0;
-    bool isHigh = true;
+    const double period = double(1) / frequency;
 
     std::vector<T> samples(numSamples);
 
     for (std::size_t i = 0; i < numSamples; i++) {
-        if (!(cycleCount < cycleDuration)) {
-            isHigh = !isHigh;
-            cycleCount = 0;
+        const double timeSeconds = double(i) / sampleRate;
+        const double periodTimeSeconds = std::fmod(timeSeconds, period);
+        const double periodPercent = periodTimeSeconds / period;
+        if (periodPercent < 0.5) { 
+            samples[i] = amplitude * 2 * periodPercent;
+        } else {
+            samples[i] = amplitude * ((2 * periodPercent) + -2);
         }
-        cycleCount++;
-
-        samples[i] = isHigh ? amplitude : -amplitude;
     }
 
     return samples;
 }
 
-// template <typename T>
-// std::vector<T> sawtoothWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
-// }
-// 
-// template <typename T>
-// std::vector<T> pulseWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
-// }
-// 
-// template <typename T>
-// std::vector<T> triangleWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
-// }
+template <typename T>
+std::vector<T> triangleWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+    assert(durationMs > 0);
+    assert(sampleRate > 0);
+    assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
+    assert(frequency > 0);
+    assert(sizeof(amplitude) == bitsPerSample / 8);
+
+    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
+    const double period = double(1) / frequency;
+
+    std::vector<T> samples(numSamples);
+
+    for (std::size_t i = 0; i < numSamples; i++) {
+        const double timeSeconds = double(i) / sampleRate;
+        const double periodTimeSeconds = std::fmod(timeSeconds, period);
+        const double periodPercent = periodTimeSeconds / period;
+        if (periodPercent < 0.25) { 
+            samples[i] = amplitude * 4 * periodPercent;
+        } else if (periodPercent < 0.75) {
+            samples[i] = amplitude * ((-4 * periodPercent) + 2);
+        } else {
+            samples[i] = amplitude * ((4 * periodPercent) + -4);
+        }
+    }
+
+    return samples;
+}
 
 template <typename T>
 std::vector<T> sinWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
@@ -179,9 +211,35 @@ std::vector<T> sinWave(int durationMs, int sampleRate, int bitsPerSample, int fr
     std::vector<T> samples(numSamples);
 
     for (std::size_t i = 0; i < numSamples; i++) {
-        const double x = double(i) / sampleRate;
-        const T sample = std::sin(2 * std::numbers::pi * frequency * x) * amplitude;
-        samples[i] = sample;
+        const double timeSeconds = double(i) / sampleRate;
+        samples[i] = std::sin(2 * std::numbers::pi * frequency * timeSeconds) * amplitude;
+    }
+
+    return samples;
+}
+
+template <typename T>
+std::vector<T> squareWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
+    assert(durationMs > 0);
+    assert(sampleRate > 0);
+    assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
+    assert(frequency > 0);
+    assert(sizeof(amplitude) == bitsPerSample / 8);
+
+    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
+    const double period = double(1) / frequency;
+
+    std::vector<T> samples(numSamples);
+
+    for (std::size_t i = 0; i < numSamples; i++) {
+        const double timeSeconds = double(i) / sampleRate;
+        const double periodTimeSeconds = std::fmod(timeSeconds, period);
+        const double periodPercent = periodTimeSeconds / period;
+        if (periodPercent < 0.5) {
+            samples[i] = amplitude;
+        } else {
+            samples[i] = -amplitude;
+        }
     }
 
     return samples;
@@ -201,17 +259,24 @@ int main() {
     // std::vector<std::uint8_t> data = createSound(numChannels, sampleRate, bitsPerSample);
     // create wav file with input values
     const int durationMs = 2000;
-    const int frequency = 440;
+    const std::int16_t frequency = 440;
     const std::int16_t amplitude = 16383;
 
-    std::vector<std::int16_t> squareSamples = squareWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
-    std::vector<std::int16_t> sinSamples = sinWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
+    // std::vector<std::int16_t> squareSamples = squareWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
+    // std::vector<std::int16_t> sinSamples = sinWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
 
-    std::vector<std::int16_t> samples(squareSamples.size());
+    // std::vector<std::int16_t> samples(squareSamples.size());
 
-    std::transform(squareSamples.begin(), squareSamples.end(), sinSamples.begin(), samples.begin(), [](std::int16_t x, std::int16_t y) {
-                return (x / 2 + y / 2) + ((x % 2 + y % 2) / 2);
-            });
+    // std::transform(squareSamples.begin(), squareSamples.end(), sinSamples.begin(), samples.begin(), [](std::int16_t x, std::int16_t y) {
+    //             return (x / 2 + y / 2) + ((x % 2 + y % 2) / 2);
+    //         });
+
+    std::vector<std::int16_t> samples = sawtoothWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
+
+    // for (int i = 0; i < 100; i++) {
+    //     std::cout << std::format("{}\n", samples[i]);
+    // }
+    // std::cout << std::endl;
 
     std::vector<std::uint8_t> data = allToLittleEndian(std::span<std::int16_t>{samples});
 

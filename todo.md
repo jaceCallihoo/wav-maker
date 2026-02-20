@@ -46,20 +46,24 @@ find out how to combine different types of waves
 create a json parser
 ```json
 {
-    "durationMs": 5000,     // optional
+    "durationMs": 5000,     // optional, can be derived from the waves delays and duration, can overwrite the duration of the other fields maybe?
     "sampleRate": 44100,    // required (all waves should be the same for now) also maybe should have a default
     "bitsPerSample": 16,    // maybe this should have a default later
     "channels": 1,          // default 1
     "waves": [
         {
-            "type": "square",
-            "frequency": 100,
-            "amplitude": 16000
+            "type": "square",       // required
+            "frequency": 100,       // required
+            "amplitude": 16000      // required
+            "delayMs": 0,           // default: 0
+            "durationMs": 3000      // required
         },
         {
             "type": "sin",
             "frequency": 100,
             "amplitude": 16000
+            "delayMs": 0,
+            "durationMs": 3000
         },
     ]
 }
@@ -67,4 +71,20 @@ create a json parser
 
 
 create a wav file visualizer
+
+
+
+    // uint8_t streakValue1 = buffer[0];
+    // uint8_t streakValue2 = buffer[1];
+    // uint8_t streakCount = 1;
+    // for (int i = 0; i < buffer.size() + 2; i += 2) {
+    //     if (buffer[i] != streakValue1 || buffer[i+1] != streakValue2) {
+    //         std::cout << std::format("{}: {:x} {:x}\n", streakCount, int(streakValue1), int(streakValue2));
+    //         streakValue1 = buffer[i];
+    //         streakValue2 = buffer[i+1];
+    //         streakCount = 1;
+    //     } else {
+    //         streakCount++;
+    //     }
+    // }
 
