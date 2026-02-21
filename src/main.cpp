@@ -293,6 +293,8 @@ void transformLinear(std::vector<double> &samples, const std::vector<Keyframe> &
     // or maybe keyframe 0% and keyframe 100% should be added before assigning leftKeyframe and rightKeyframe
     assert(keyframes.size() > 0);
 
+    // TODO: maybe convert the keyframe percents into indicies? (maybe this is already happening idk)
+
     // auto nextKeyframePercent = keyframes.begin();
     size_t numSamples = samples.size();
     double currentPercent = 0.0;
@@ -339,7 +341,7 @@ void transformLinear(std::vector<double> &samples, const std::vector<Keyframe> &
 
 struct Sound {
     int sampleRate;
-    int startTimeMs;
+    size_t delaySamples;
     std::vector<double> samples;
 };
 
@@ -348,46 +350,62 @@ Sound combine(const std::vector<Sound> &sounds) {
     // assert all sampleRate are the same 
     // can we do this at compile time by making sampleRate a type?
 
-    auto getEndTime = [](Sound sound){
-        return ((sound.samples.size() * 1000) / sound.sampleRate) + sound.startTimeMs;
+    // auto getEndTime = [](Sound sound){
+    //     return ((sound.samples.size() * 1000) / sound.sampleRate) + sound.startTimeMs;
+    // };
+
+    auto getLastSampleIndex = [](Sound sound){
+        return sound.delaySamples + sound.samples.size();
     };
 
-    int earliestStartTimeMs = sounds[0].startTimeMs;
-    int latestEndTimeMs = getEndTime(sounds[0]);
+    size_t earliestSampleIndex = sounds[0].delaySamples;
+    size_t latestSampleIndex = getLastSampleIndex(sounds[0]); // (-1? or should this be treated as [,) (an upper bound) )
+
+    // int earliestStartTimeMs = sounds[0].startTimeMs;
+    // int latestEndTimeMs = getEndTime(sounds[0]);
     for (size_t i = 1; i < sounds.size(); i++) {
         // TODO: maybe find a better way to do this
         assert(sounds[i].sampleRate == sounds[i-1].sampleRate);
 
-        if (sounds[i].startTimeMs < earliestStartTimeMs) {
-            earliestStartTimeMs = sounds[i].startTimeMs;
+        if (sounds[i].delaySamples < earliestSampleIndex) {
+            earliestSampleIndex = sounds[i].delaySamples;
         }
 
-        const int endTime = getEndTime(sounds[i]);
-        if (endTime > latestEndTimeMs) {
-            latestEndTimeMs = endTime;
+        const size_t lastSampleIndex = getLastSampleIndex(sounds[i]);
+        if (latestSampleIndex > lastSampleIndex) {
+            latestSampleIndex = lastSampleIndex;
         }
     }
 
-    const int firstSampleIndex = (earliestStartTime * 1000) * sampleRate;
-    const int lastSampleIndex = 0; //TODO:
-    const resultSize = lastSampleIndex - firstSampleIndex;
+    // const int firstSampleIndex = (earliestStartTimeMs * sampleRate) / 1000;
+    // const int lastSampleIndex = 0; //TODO:
+
+    // const size_t resultSize = lastSampleIndex - firstSampleIndex;
 
     // std::cout << std::format("st: {} et: {}", earliestStartTimeMs, latestEndTimeMs) << std::endl;
 
     // (durationMs * sampleRate) / 1000;
 
-    const int resultDurationMs = latestEndTimeMs - earliestStartTimeMs;
-    const size_t resultSize = resultDurationMs * (sounds[0].sampleRate / 1000);
+    // const int resultDurationMs = latestEndTimeMs - earliestStartTimeMs;
+    // const size_t resultSize = resultDurationMs * (sounds[0].sampleRate / 1000);
+    const size_t resultSize = latestSampleIndex - earliestSampleIndex; // TODO: check for off by 1
     Sound result = {
         .sampleRate = sounds[0].sampleRate,
-        .startTimeMs = earliestStartTimeMs,
+        .delaySamples = earliestSampleIndex, // TODO: check for off by 1
         .samples = std::vector<double>(resultSize),
     };
 
+    // for each sound
     for (size_t i = 0; i < sounds.size(); i++) {
-        const size_t firstSampleIndex = sounds[i].startTimeMs * sounds[i].sampleRate / 1000;
+        // const size_t firstSampleIndex = sounds[i].startTimeMs * sounds[i].sampleRate / 1000;
+        const size_t relativeSoundStartIndex = sounds[i].delaySamples - result.delaySamples;
+
+        // for each sample within the sound
         for (size_t j = 0; j < sounds[i].samples.size(); j++) {
-            result.samples[firstSampleIndex + j] = sounds[i].samples[j];
+
+            result.samples[relativeSoundStartIndex + j] += sounds[i].samples[j];
+
+            // result.samples[firstSampleIndex + j] = sounds[i].samples[j];
         }
     }
 
@@ -411,7 +429,7 @@ int main() {
     // create sound with input values
     // std::vector<std::uint8_t> data = createSound(numChannels, sampleRate, bitsPerSample);
     // create wav file with input values
-    const int durationMs = 200;
+    const int durationMs = 2000;
     const int frequency = 440;
     // const std::int16_t amplitude = 16383;
 
@@ -438,8 +456,16 @@ int main() {
     // vizualize(samples2);
     Sound s = {
         .sampleRate = sampleRate,
-        .startTimeMs = 0,
+        .delaySamples = 0,
         .samples = samples2,
+    };
+
+    std::vector<double> samples3(samples2);
+    transformInvert(samples3);
+    Sound s3 = {
+        .sampleRate = sampleRate,
+        .delaySamples = 0,
+        .samples = samples3,
     };
 
     Sound s2 = combine(std::vector<Sound>({s}));
