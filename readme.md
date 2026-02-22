@@ -29,3 +29,13 @@ https://web.archive.org/web/20250610165025/http://soundfile.sapp.org/doc/WaveFor
 // Subchunk2Size    derived (NumSamples * NumChannels * BitsPerSample/8)
 // Data             variable
 ```
+
+
+## Wave Math
+
+Time (duration) x sample rate is used to determine the number of samples
+For each sample, sample index x sample rate is used to determine time
+Time x frequency used to determine amplitude
+
+
+

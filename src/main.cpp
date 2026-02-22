@@ -143,12 +143,26 @@ public:
 // std::vector<T> pulseWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
 // }
 
-std::vector<double> sawtoothWave(int durationMs, int sampleRate, int frequency) {
-    assert(durationMs > 0);
+double sawtoothWave2(size_t sampleIndex, int sampleRate, int frequency) {
     assert(sampleRate > 0);
     assert(frequency > 0);
 
-    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
+    const double timeSeconds = double(sampleIndex) / sampleRate;
+    const double periodsElapsed = timeSeconds * frequency;
+    const double partialPeriod = periodsElapsed - floor(periodsElapsed);
+
+    if (partialPeriod < 0.5) { 
+        return 2 * partialPeriod;
+    } else {
+        return (2 * partialPeriod) + -2;
+    }
+}
+
+std::vector<double> sawtoothWave(size_t numSamples, int sampleRate, int frequency) {
+    assert(numSamples > 0);
+    assert(sampleRate > 0);
+    assert(frequency > 0);
+
     const double period = double(1) / frequency;
 
     std::vector<double> samples(numSamples);
@@ -167,12 +181,28 @@ std::vector<double> sawtoothWave(int durationMs, int sampleRate, int frequency) 
     return samples;
 }
 
-std::vector<double> triangleWave(int durationMs, int sampleRate, int frequency) {
-    assert(durationMs > 0);
+double triangleWave2(size_t sampleIndex, int sampleRate, int frequency) {
     assert(sampleRate > 0);
     assert(frequency > 0);
 
-    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
+    const double timeSeconds = double(sampleIndex) / sampleRate;
+    const double periodsElapsed = timeSeconds * frequency;
+    const double partialPeriod = periodsElapsed - floor(periodsElapsed);
+
+    if (partialPeriod < 0.25) { 
+        return 4 * partialPeriod;
+    } else if (partialPeriod < 0.75) {
+        return (-4 * partialPeriod) + 2;
+    } else {
+        return (4 * partialPeriod) + -4;
+    }
+}
+
+std::vector<double> triangleWave(size_t numSamples, int sampleRate, int frequency) {
+    assert(numSamples > 0);
+    assert(sampleRate > 0);
+    assert(frequency > 0);
+
     const double period = double(1) / frequency;
 
     std::vector<double> samples(numSamples);
@@ -193,12 +223,19 @@ std::vector<double> triangleWave(int durationMs, int sampleRate, int frequency) 
     return samples;
 }
 
-std::vector<double> sinWave(int durationMs, int sampleRate, int frequency) {
-    assert(durationMs > 0);
+double sinWave2(size_t sampleIndex, int sampleRate, int frequency) {
     assert(sampleRate > 0);
     assert(frequency > 0);
 
-    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
+    const double timeSeconds = double(sampleIndex) / sampleRate;
+
+    return std::sin(2 * std::numbers::pi * frequency * timeSeconds);
+}
+
+std::vector<double> sinWave(size_t numSamples, int sampleRate, int frequency) {
+    assert(numSamples > 0);
+    assert(sampleRate > 0);
+    assert(frequency > 0);
 
     std::vector<double> samples(numSamples);
 
@@ -210,12 +247,26 @@ std::vector<double> sinWave(int durationMs, int sampleRate, int frequency) {
     return samples;
 }
 
-std::vector<double> squareWave(int durationMs, int sampleRate, int frequency) {
-    assert(durationMs > 0);
+double squareWave2(size_t sampleIndex, int sampleRate, int frequency) {
     assert(sampleRate > 0);
     assert(frequency > 0);
 
-    const std::size_t numSamples = (durationMs * sampleRate) / 1000;
+    const double timeSeconds = double(sampleIndex) / sampleRate;
+    const double periodsElapsed = timeSeconds * frequency;
+    const double partialPeriod = periodsElapsed - floor(periodsElapsed);    // this should better distribute the error
+
+    if (partialPeriod < 0.5) {
+        return 1.0;
+    } else {
+        return -1.0;
+    }
+}
+
+std::vector<double> squareWave(size_t numSamples, int sampleRate, int frequency) {
+    assert(numSamples > 0);
+    assert(sampleRate > 0);
+    assert(frequency > 0);
+
     const double period = double(1) / frequency;
 
     std::vector<double> samples(numSamples);
@@ -232,6 +283,16 @@ std::vector<double> squareWave(int durationMs, int sampleRate, int frequency) {
     }
 
     return samples;
+}
+
+template <typename T>
+T quantize2(double sample, int bitsPerSample) {
+    assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
+    assert(bitsPerSample / 8 == sizeof(T));
+
+    // TODO: this probably does not need to be computed at runtime
+    T maxAmplitude = (std::pow(2, bitsPerSample) / 2) - 1;
+    return sample * maxAmplitude;
 }
 
 
@@ -345,67 +406,71 @@ struct Sound {
     std::vector<double> samples;
 };
 
+struct Generator {
+    double (*function)(size_t, int, int);
+    size_t delaySamples;
+    size_t numSamples;
+    int sampleRate; // TODO: should this be moved higher up since this can'd differ per function
+    int frequency;
+};
+
+// should this return a double?
+double combine2(std::vector<Generator> generators, size_t sampleIndex) {
+    double combined = 0;
+
+    for (const auto &generator : generators) {
+        const auto& function = generator.function;
+        const auto& delaySamples = generator.delaySamples;
+        const auto& numSamples = generator.numSamples;
+        const auto& sampleRate = generator.sampleRate;
+        const auto& frequency = generator.frequency;
+
+        if (sampleIndex < delaySamples) {
+            continue;
+        }
+
+        if (sampleIndex > delaySamples + numSamples) {
+            continue;
+        }
+
+        combined += function(sampleIndex, sampleRate, frequency) / generators.size();
+    }
+
+    combined /= generators.size();
+
+    return combined;
+}
+
 Sound combine(const std::vector<Sound> &sounds) {
     assert(sounds.size() > 0);
+    for (size_t i = 1; i < sounds.size(); i++) {
+        assert(sounds[i].sampleRate == sounds[i-1].sampleRate);
+    }
     // assert all sampleRate are the same 
     // can we do this at compile time by making sampleRate a type?
 
-    // auto getEndTime = [](Sound sound){
-    //     return ((sound.samples.size() * 1000) / sound.sampleRate) + sound.startTimeMs;
-    // };
-
     auto getLastSampleIndex = [](Sound sound){
-        return sound.delaySamples + sound.samples.size();
+        return sound.delaySamples + sound.samples.size() - 1;
     };
 
     size_t earliestSampleIndex = sounds[0].delaySamples;
-    size_t latestSampleIndex = getLastSampleIndex(sounds[0]); // (-1? or should this be treated as [,) (an upper bound) )
-
-    // int earliestStartTimeMs = sounds[0].startTimeMs;
-    // int latestEndTimeMs = getEndTime(sounds[0]);
+    size_t latestSampleIndex = getLastSampleIndex(sounds[0]);
     for (size_t i = 1; i < sounds.size(); i++) {
-        // TODO: maybe find a better way to do this
-        assert(sounds[i].sampleRate == sounds[i-1].sampleRate);
-
-        if (sounds[i].delaySamples < earliestSampleIndex) {
-            earliestSampleIndex = sounds[i].delaySamples;
-        }
-
-        const size_t lastSampleIndex = getLastSampleIndex(sounds[i]);
-        if (latestSampleIndex > lastSampleIndex) {
-            latestSampleIndex = lastSampleIndex;
-        }
+        earliestSampleIndex = std::min(earliestSampleIndex, sounds[i].delaySamples);
+        latestSampleIndex = std::max(latestSampleIndex, getLastSampleIndex(sounds[i]));
     }
 
-    // const int firstSampleIndex = (earliestStartTimeMs * sampleRate) / 1000;
-    // const int lastSampleIndex = 0; //TODO:
-
-    // const size_t resultSize = lastSampleIndex - firstSampleIndex;
-
-    // std::cout << std::format("st: {} et: {}", earliestStartTimeMs, latestEndTimeMs) << std::endl;
-
-    // (durationMs * sampleRate) / 1000;
-
-    // const int resultDurationMs = latestEndTimeMs - earliestStartTimeMs;
-    // const size_t resultSize = resultDurationMs * (sounds[0].sampleRate / 1000);
-    const size_t resultSize = latestSampleIndex - earliestSampleIndex; // TODO: check for off by 1
+    const size_t resultSize = latestSampleIndex - earliestSampleIndex + 1;
     Sound result = {
         .sampleRate = sounds[0].sampleRate,
-        .delaySamples = earliestSampleIndex, // TODO: check for off by 1
+        .delaySamples = earliestSampleIndex,
         .samples = std::vector<double>(resultSize),
     };
 
-    // for each sound
     for (size_t i = 0; i < sounds.size(); i++) {
-        // const size_t firstSampleIndex = sounds[i].startTimeMs * sounds[i].sampleRate / 1000;
         const size_t relativeSoundStartIndex = sounds[i].delaySamples - result.delaySamples;
-
-        // for each sample within the sound
         for (size_t j = 0; j < sounds[i].samples.size(); j++) {
-
             result.samples[relativeSoundStartIndex + j] += sounds[i].samples[j];
-
-            // result.samples[firstSampleIndex + j] = sounds[i].samples[j];
         }
     }
 
@@ -414,6 +479,19 @@ Sound combine(const std::vector<Sound> &sounds) {
     }
 
     return result;
+}
+
+void crop(Sound &sound, size_t leftCrop, size_t rightCrop) {
+
+    const size_t delaySamples = sound.delaySamples;
+    const auto& samples = sound.samples;
+
+    // adjust the delay
+    sound.delaySamples = std::max<size_t>(0, delaySamples - leftCrop);
+
+    sound.samples.erase(samples.begin(), samples.begin() + std::clamp<size_t>(leftCrop - delaySamples, 0, samples.size()));
+    // Idk if I need a bounds check here
+    sound.samples.resize(samples.size() - rightCrop);
 }
 
 int main() {
@@ -432,6 +510,29 @@ int main() {
     const int durationMs = 2000;
     const int frequency = 440;
     // const std::int16_t amplitude = 16383;
+    const size_t numSamples = (durationMs * sampleRate) / 1000;
+
+    Generator g1 = {
+        .function = sinWave2,
+        .delaySamples = 50000,
+        .numSamples = numSamples,
+        .sampleRate = sampleRate,
+        .frequency = frequency,
+    };
+
+    std::vector<std::uint8_t> bytes;
+    for (size_t i = 0; i < numSamples; i++) {
+        const double normalAmplitude = combine2(std::vector<Generator>({g1}), i);
+
+        std::string buffer(20, ' ');
+        size_t index = std::min((1 + normalAmplitude) * 10, double(19));
+        buffer[index] = '.';
+        std::cout << buffer << '\n';
+
+        const auto quantizedAmplitude = quantize2<std::int16_t>(normalAmplitude, bitsPerSample);
+        const auto byteAmplitude = toLittleEndian(quantizedAmplitude);
+        bytes.insert(bytes.end(), byteAmplitude.begin(), byteAmplitude.end());
+    }
 
     // std::vector<std::int16_t> squareSamples = squareWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
     // std::vector<std::int16_t> sinSamples = sinWave(durationMs, sampleRate, bitsPerSample, frequency, amplitude);
@@ -442,7 +543,7 @@ int main() {
     //             return (x / 2 + y / 2) + ((x % 2 + y % 2) / 2);
     //         });
 
-    std::vector<double> samples2 = sinWave(durationMs, sampleRate, frequency);
+    std::vector<double> samples2 = sinWave(numSamples, sampleRate, frequency);
     // for (int i = 0; i < 100; i++) {
     //     std::cout << std::format("{}\n", samples2[i]);
     // }
@@ -464,11 +565,12 @@ int main() {
     transformInvert(samples3);
     Sound s3 = {
         .sampleRate = sampleRate,
-        .delaySamples = 0,
+        .delaySamples = 188200,
         .samples = samples3,
     };
 
-    Sound s2 = combine(std::vector<Sound>({s}));
+    Sound s2 = combine(std::vector<Sound>({s, s3}));
+    // crop(s2, 88200, 0);
     std::cout << std::format("samples2.size() {} - s2.samples.size() {}\n", samples2.size(), s2.samples.size());
 
     std::vector<std::int16_t> samples = quantize<std::int16_t>(s2.samples, bitsPerSample);
@@ -480,7 +582,7 @@ int main() {
 
     std::vector<std::uint8_t> data = allToLittleEndian(std::span<std::int16_t>{samples});
 
-    Wav wave(numChannels, sampleRate, bitsPerSample, data);
+    Wav wave(numChannels, sampleRate, bitsPerSample, bytes);
 
     std::vector<std::uint8_t> buffer = wave.toBytes();
 
