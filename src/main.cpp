@@ -20,16 +20,6 @@
 // TODO: shoulde the function names be camel case? Check google formatting standards
 // TODO: check the class field names as well
 
-
-template <typename T>
-constexpr std::array<uint8_t, sizeof(T)> toLittleEndian(T value) {
-    std::array<uint8_t, sizeof(T)> out{};
-    for (size_t i = 0; i < sizeof(T); ++i) {
-        out[i] = static_cast<uint8_t>((value >> (8 * i)) & 0xFF);
-    }
-    return out;
-}
-
 void writeHelper(std::span<const std::uint8_t> value, std::size_t offset, std::vector<std::uint8_t>& bytes) {
     if (offset + value.size() > bytes.size()) {
         throw std::out_of_range("writeHelper would write past end of buffer");
@@ -38,53 +28,6 @@ void writeHelper(std::span<const std::uint8_t> value, std::size_t offset, std::v
     std::copy(value.begin(), value.end(), bytes.begin() + offset);
 }
 
-std::vector<std::uint8_t> createHeader(std::uint16_t numChannels, std::uint32_t sampleRate, std::uint16_t bitsPerSample, size_t samplesSize) {
-    const static std::size_t offsetChunkId = 0;
-    const static std::size_t offsetChunkSize = 4;
-    const static std::size_t offsetFormat = 8;
-    const static std::size_t offsetSubchunk1Id = 12;
-    const static std::size_t offsetSubchunk1Size = 16;
-    const static std::size_t offsetAudioFormat = 20;
-    const static std::size_t offsetNumChannels = 22;
-    const static std::size_t offsetSampleRate = 24;
-    const static std::size_t offsetByteRate = 28;
-    const static std::size_t offsetBlockAlign = 32;
-    const static std::size_t offsetBitsPerSample = 34;
-    const static std::size_t offsetSubchunk2Id = 36;
-    const static std::size_t offsetSubchunk2Size = 40;
-    // const static std::size_t offsetData = 44;
-
-    const static constexpr std::array<std::uint8_t, 4> chunkId = {'R', 'I', 'F', 'F'};
-    const static constexpr std::array<std::uint8_t, 4> format = {'W', 'A', 'V', 'E'};
-    const static constexpr std::array<std::uint8_t, 4> subchunk1Id = {'f', 'm', 't', ' '};
-    const static constexpr std::array<std::uint8_t, 4> subchunk1Size = toLittleEndian<std::uint32_t>(16);
-    const static constexpr std::array<std::uint8_t, 2> audioFormat = toLittleEndian<std::uint16_t>(1);
-    const static constexpr std::array<std::uint8_t, 4> subchunk2Id = {'d', 'a', 't', 'a'};
-
-    std::array<std::uint8_t, 4> chunkSize = toLittleEndian<std::uint32_t>(36 + samplesSize);
-    std::array<std::uint8_t, 4> byteRate = toLittleEndian<std::uint32_t>(sampleRate * numChannels * bitsPerSample / 8);
-    std::array<std::uint8_t, 2> blockAlign = toLittleEndian<std::uint16_t>(numChannels * bitsPerSample / 8);
-    std::array<std::uint8_t, 4> subchunk2Size = toLittleEndian<std::uint32_t>(samplesSize);
-
-    std::vector<std::uint8_t> bytes(44);
-
-    // TODO: should this take a writer as an argument insteado of writing to a buffer?
-    writeHelper(chunkId, offsetChunkId, bytes);
-    writeHelper(chunkSize, offsetChunkSize, bytes);
-    writeHelper(format, offsetFormat, bytes);
-    writeHelper(subchunk1Id, offsetSubchunk1Id, bytes);
-    writeHelper(subchunk1Size, offsetSubchunk1Size, bytes);
-    writeHelper(audioFormat, offsetAudioFormat, bytes);
-    writeHelper(toLittleEndian<std::uint16_t>(numChannels), offsetNumChannels, bytes);
-    writeHelper(toLittleEndian<std::uint32_t>(sampleRate), offsetSampleRate, bytes);
-    writeHelper(byteRate, offsetByteRate, bytes);
-    writeHelper(blockAlign, offsetBlockAlign, bytes);
-    writeHelper(toLittleEndian<std::uint16_t>(bitsPerSample), offsetBitsPerSample, bytes);
-    writeHelper(subchunk2Id, offsetSubchunk2Id, bytes);
-    writeHelper(subchunk2Size, offsetSubchunk2Size, bytes);
-
-    return bytes;
-}
 
 // bitsPerSample: how many bits are used to record a sample (not important until later when writing)
 // apmlitude: distance of the wave sample from 0 (also not super important to the calc)
@@ -110,252 +53,10 @@ std::vector<std::uint8_t> createHeader(std::uint16_t numChannels, std::uint32_t 
 // std::vector<T> pulseWave(int durationMs, int sampleRate, int bitsPerSample, int frequency, T amplitude) {
 // }
 
-double sawtoothWave(double timeSeconds, double frequency) {
-    assert(timeSeconds >= 0);
-    assert(frequency > 0);
-
-    const double periodsElapsed = timeSeconds * frequency;
-    const double partialPeriod = periodsElapsed - floor(periodsElapsed);
-
-    if (partialPeriod < 0.5) { 
-        return 2 * partialPeriod;
-    } else {
-        return (2 * partialPeriod) + -2;
-    }
-}
-
-double triangleWave(double timeSeconds, double frequency) {
-    assert(timeSeconds >= 0);
-    assert(frequency > 0);
-
-    const double periodsElapsed = timeSeconds * frequency;
-    const double partialPeriod = periodsElapsed - floor(periodsElapsed);
-
-    if (partialPeriod < 0.25) { 
-        return 4 * partialPeriod;
-    } else if (partialPeriod < 0.75) {
-        return (-4 * partialPeriod) + 2;
-    } else {
-        return (4 * partialPeriod) + -4;
-    }
-}
-
-double sinWave(double timeSeconds, double frequency) {
-    assert(timeSeconds >= 0);
-    assert(frequency > 0);
-
-    return std::sin(2 * std::numbers::pi * frequency * timeSeconds);
-}
-
-// assumes sorted data
-double keyframeAverage(std::vector<Keyframe> keyframes) {
-    assert(keyframes.size() >= 2);
-    assert(keyframes[0].percent == 0.0);
-    assert(keyframes[keyframes.size()-1].percent == 1.0);
-
-    double result = 0.0;
-
-    for (size_t i = 1; i < keyframes.size(); i++) {
-        const double gapSize = (keyframes[i].percent - keyframes[i-1].percent);
-        const double averageMultiplier = (keyframes[i].value + keyframes[i-1].value) / 2;
-
-        result += gapSize * averageMultiplier;
-    }
-
-    return result;
-}
-
 // TODO: should test this more, it could have bugs
-double keyframeAverage(const std::vector<Keyframe> &keyframes, double percent) {
-    assert(percent >= 0);
-    assert(percent <= 1.0);
-    assert(keyframes.size() >= 2);
-    assert(keyframes[0].percent == 0.0);
-    assert(keyframes[keyframes.size()-1].percent == 1.0);
-
-    if (percent == 0.0) {
-        return keyframes[0].value;
-    }
-
-
-    double result = 0.0;
-
-    // add up all the previous gaps
-    size_t i = 1;
-    while (i < keyframes.size() && keyframes[i].percent < percent) {
-        const double averageMultiplier = (keyframes[i].value + keyframes[i-1].value) / 2;
-        const double gapSize = (keyframes[i].percent - keyframes[i-1].percent);
-
-        result += gapSize * averageMultiplier;
-
-        i++;
-    }
-
-    if (i < keyframes.size()) {
-        double keyframeMultiplierDifference = keyframes[i-1].value - keyframes[i].value;  // rise
-        double keyframePercentDifference = keyframes[i-1].percent - keyframes[i].percent;           // run
-        double slope = keyframeMultiplierDifference / keyframePercentDifference;
-        double x = percent - keyframes[i-1].percent;
-        double y = x * slope + keyframes[i-1].value;
-
-        result += ((y + keyframes[i-1].value) / 2) * x;
-
-    }
-
-    result /= percent;
-
-    return result;
-}
-
-// double squareWave2(size_t sampleIndex, int sampleRate, const std::vector<Keyframe> &amplitudeUpKeyframes, double percent) {
-//     assert(sampleRate > 0);
-//     assert(amplitudeUpKeyframes.size() > 0);
-// 
-//     X x = keyframeAverage(amplitudeUpKeyframes, percent);
-// 
-//     const double timeSeconds = double(sampleIndex) / sampleRate;
-//     const double periodsElapsed = timeSeconds * x.previousAverage;
-//     const double partialPeriod = periodsElapsed - floor(periodsElapsed);
-// 
-//     if (partialPeriod < 0.5) {
-//         return 1.0;
-//     } else {
-//         return -1.0;
-//     }
-// }
-
-double squareWave(double timeSeconds, double frequency) {
-    assert(timeSeconds >= 0);
-    assert(frequency > 0);
-
-    const double periodsElapsed = timeSeconds * frequency;
-    const double partialPeriod = periodsElapsed - floor(periodsElapsed);
-
-    if (partialPeriod < 0.5) {
-        return 1.0;
-    } else {
-        return -1.0;
-    }
-}
-
-template <typename T>
-T quantize(double sample, int bitsPerSample) {
-    assert(bitsPerSample % 8 == 0 && bitsPerSample >= 8);
-    assert(bitsPerSample / 8 == sizeof(T));
-
-    // TODO: this probably does not need to be computed at runtime
-    T maxAmplitude = (std::pow(2, bitsPerSample) / 2) - 1;
-    return sample * maxAmplitude;
-}
-
-// vertical transforms ////////////////////////////////////////////////////////
-// TODO: probably don't need these anymore
-void transformScale(std::vector<double> &samples, double scaler) {
-    for (auto &sample : samples) {
-        sample *= scaler;
-    }
-}
-
-// TODO: if this is still used it can just be a scale with -1.0
-void transformInvert(std::vector<double> &samples) {
-    for (auto &sample : samples) {
-        sample = -sample;
-    }
-}
-
-void transformOffset(std::vector<double> &samples, double offset) {
-    for (auto &sample : samples) {
-        sample += offset;
-    }
-}
-
-// void transformBezier(std::vector<double> &samples, double x1, double y1, double x2, double y2) {
-//     // TODO: maybe normalize first?
-//     for (auto &sample : samples) {
-//         sample = 0;
-//     }
-// }
-
 // should this function cache it's previous state for performance? too early to tell
 // should this function just return the multiplier?
-double transformLinear(double samplePercent, const std::vector<Keyframe> &keyframes) {
-    assert(samplePercent >= 0);
-    assert(samplePercent <= 1.0);
-    assert(keyframes.size() > 0);
 
-    // hold first / hold last
-
-    if (keyframes.size() == 1) {
-        return keyframes[0].value;
-    }
-
-    // if we're before the first keyframe
-    // return sample * keframe
-    if (samplePercent <= keyframes[0].percent) {
-        return keyframes[0].value;
-    }
-
-    // if we're after the last keyframe
-    if (samplePercent >= keyframes[keyframes.size() - 1].percent) {
-        return keyframes[keyframes.size() - 1].value;
-    }
-
-    size_t leftKeyframeIndex = 0;
-    size_t rightKeyframeIndex = 1;
-    while (samplePercent >= keyframes[rightKeyframeIndex].percent) {
-        leftKeyframeIndex++;
-        rightKeyframeIndex++;
-    }
-
-    double keyframePercentDifference = keyframes[leftKeyframeIndex].percent - keyframes[rightKeyframeIndex].percent;
-    double keyframeMultiplierDifference = keyframes[leftKeyframeIndex].value - keyframes[rightKeyframeIndex].value;
-    double slope = keyframeMultiplierDifference / keyframePercentDifference;
-    double sampleMultiplier = (samplePercent - keyframes[leftKeyframeIndex].percent) * slope + keyframes[leftKeyframeIndex].value;
-
-    return sampleMultiplier;
-}
-
-double combine2(const std::vector<Sound*> &sounds, size_t sampleIndex) {
-    double combined = 0;
-
-    for (const auto &sound : sounds) {
-        const auto& function = sound->function;
-        const auto& delaySamples = sound->delaySamples;
-        const auto& numSamples = sound->numSamples;
-        const auto& sampleRate = sound->sampleRate;
-        const auto& frequency = sound->frequency;
-        const auto& amplitude = sound->amplitude;
-
-        // const auto& linearTransformKeyframes = sound->linearTransformKeyframes;
-
-        if (sampleIndex < delaySamples) {
-            continue;
-        }
-
-        if (sampleIndex >= delaySamples + numSamples) {
-            continue;
-        }
-
-        const double timeSeconds = double(sampleIndex) / sampleRate;
-        const double percent = double(sampleIndex - delaySamples) / numSamples;
-
-        double current = function(timeSeconds, frequency->f(percent));
-
-        // const double activeSamplePercent = double(sampleIndex - delaySamples) / numSamples;
-
-        // if (linearTransformKeyframes.size() > 0) {
-        //     combined *= transformLinear(activeSamplePercent, linearTransformKeyframes);
-        // }
-
-        current *= amplitude->f(percent);
-
-        combined += current;
-    }
-
-    combined /= sounds.size();
-
-    return combined;
-}
 
 int main() {
     
@@ -458,10 +159,10 @@ int main() {
 
     std::vector<std::uint8_t> bytes(numSamples * (bitsPerSample / 8));
     for (size_t i = 0; i < numSamples; i++) {
-        const double normalAmplitude = combine2({&s1, &s2}, i);
+        const double normalAmplitude = combine({&s1, &s2}, i);
 
-        // const double x = combine2({&s1}, i);
-        // const double x = combine2({&s2}, i);
+        // const double x = combine({&s1}, i);
+        // const double x = combine({&s2}, i);
 
         // if (x > 0.0 && state == DOWN) {
         //     state = UP;
@@ -495,7 +196,7 @@ int main() {
 
     // std::vector<std::uint8_t> buffer = wave.toBytes();
 
-    std::vector<std::uint8_t> header = createHeader(numChannels, sampleRate, bitsPerSample, bytes.size());
+    std::array<std::uint8_t, 44> header = createHeader(numChannels, sampleRate, bitsPerSample, bytes.size());
 
     //////////////////////////////////////////////////////////////////////
     // write to file
