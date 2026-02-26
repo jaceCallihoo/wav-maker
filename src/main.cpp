@@ -17,16 +17,10 @@
 
 #define assertm(exp, msg) assert((void(msg), exp))
 
+#define BUFFER_SIZE 500
+
 // TODO: shoulde the function names be camel case? Check google formatting standards
 // TODO: check the class field names as well
-
-void writeHelper(std::span<const std::uint8_t> value, std::size_t offset, std::vector<std::uint8_t>& bytes) {
-    if (offset + value.size() > bytes.size()) {
-        throw std::out_of_range("writeHelper would write past end of buffer");
-    }
-
-    std::copy(value.begin(), value.end(), bytes.begin() + offset);
-}
 
 
 // bitsPerSample: how many bits are used to record a sample (not important until later when writing)
@@ -64,6 +58,7 @@ int main() {
     const int numChannels = 1;
     const int sampleRate = 44100;
     const int bitsPerSample = 16;
+    const int bytesPerSample = bitsPerSample / 8;
 
     // create sound with input values
     // std::vector<std::uint8_t> data = createSound(numChannels, sampleRate, bitsPerSample);
@@ -150,41 +145,52 @@ int main() {
     ///////////////
 
 
+    std::ofstream file("output.wav", std::ios::binary);
+    if (!file) {
+        std::cerr << "failed to open file\n";
+        return 1;
+    }
 
+    std::array header = createHeader(numChannels, sampleRate, bitsPerSample, sampleRate * bytesPerSample);
     // const int UP = 1;
     // const int DOWN = 2;
 
     // int state = UP;
     // size_t previousPeriodStart = 0;
+    file.write(reinterpret_cast<const char*>(header.data()), header.size());
 
-    std::vector<std::uint8_t> bytes(numSamples * (bitsPerSample / 8));
-    for (size_t i = 0; i < numSamples; i++) {
-        const double normalAmplitude = combine({&s1, &s2}, i);
+    // numSamples * (bitsPerSample / 8)
+    for (size_t i = 0; i < numSamples;) {
+        std::array<std::uint8_t, BUFFER_SIZE> bytes;
+        for (size_t j = 0; j < BUFFER_SIZE / bytesPerSample; j++, i++) {
+            const double normalAmplitude = combine({&s1, &s2}, i);
 
-        // const double x = combine({&s1}, i);
-        // const double x = combine({&s2}, i);
+            // const double x = combine({&s1}, i);
+            // const double x = combine({&s2}, i);
 
-        // if (x > 0.0 && state == DOWN) {
-        //     state = UP;
-        //     size_t numSamplesInPeriod = i - previousPeriodStart;
-        //     double periodDuration = double(numSamplesInPeriod) / sampleRate;
-        //     double frequency = 1 / periodDuration;
-        //     std::cout << std::format("wave frequency: {}\nperiodDuration: {}s\nnumSamplesInPeriod: {}\n\n", frequency, periodDuration, numSamplesInPeriod);
-        //     previousPeriodStart = i;
-        // } else if (x < 0.0 && state == UP) {
-        //     state = DOWN;
-        //     // do nothing else here since it's only half
-        // }
+            // if (x > 0.0 && state == DOWN) {
+            //     state = UP;
+            //     size_t numSamplesInPeriod = i - previousPeriodStart;
+            //     double periodDuration = double(numSamplesInPeriod) / sampleRate;
+            //     double frequency = 1 / periodDuration;
+            //     std::cout << std::format("wave frequency: {}\nperiodDuration: {}s\nnumSamplesInPeriod: {}\n\n", frequency, periodDuration, numSamplesInPeriod);
+            //     previousPeriodStart = i;
+            // } else if (x < 0.0 && state == UP) {
+            //     state = DOWN;
+            //     // do nothing else here since it's only half
+            // }
 
-        // std::string buffer(20, ' ');
-        // size_t index = std::min((1 + normalAmplitude) * 10, double(19));
-        // buffer[index] = '.';
-        // std::cout << buffer << '\n';
+            // std::string buffer(20, ' ');
+            // size_t index = std::min((1 + normalAmplitude) * 10, double(19));
+            // buffer[index] = '.';
+            // std::cout << buffer << '\n';
 
-        const auto quantizedAmplitude = quantize<std::int16_t>(normalAmplitude, bitsPerSample);
-        const auto byteAmplitude = toLittleEndian(quantizedAmplitude);
-        writeHelper(byteAmplitude, i * (bitsPerSample / 8), bytes);
-        // bytes.insert(bytes.end(), byteAmplitude.begin(), byteAmplitude.end());
+            const auto quantizedAmplitude = quantize<std::int16_t>(normalAmplitude, bitsPerSample);
+            const auto byteAmplitude = toLittleEndian(quantizedAmplitude);
+            writeAtOffset(byteAmplitude, j * bytesPerSample, bytes);
+            // bytes.insert(bytes.end(), byteAmplitude.begin(), byteAmplitude.end());
+        }
+        file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     }
 
     // for (size_t i = 0; i < bytes.size(); i++) {
@@ -196,23 +202,15 @@ int main() {
 
     // std::vector<std::uint8_t> buffer = wave.toBytes();
 
-    std::array<std::uint8_t, 44> header = createHeader(numChannels, sampleRate, bitsPerSample, bytes.size());
 
     //////////////////////////////////////////////////////////////////////
     // write to file
 
-    std::ofstream file("output.wav", std::ios::binary);
-    if (!file) {
-        std::cerr << "failed to open file\n";
-        return 1;
-    }
+    file.close();
 
 
     // file.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-    file.write(reinterpret_cast<const char*>(header.data()), header.size());
-    file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
     // optional, this is called when the file leaves scope
-    file.close();
 
     return 0;
 }

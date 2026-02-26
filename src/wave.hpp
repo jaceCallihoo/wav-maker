@@ -73,7 +73,6 @@ double sinWave(double timeSeconds, double frequency);
 
 //
 std::array<std::uint8_t, 44> createHeader(std::uint16_t numChannels, std::uint32_t sampleRate, std::uint16_t bitsPerSample, size_t samplesSize);
-void createHeader2(IBuffer &buffer, std::uint16_t numChannels, std::uint32_t sampleRate, std::uint16_t bitsPerSample, size_t samplesSize);
 double combine(const std::vector<Sound*> &sounds, size_t sampleIndex);
 
 // templates //////////////////////////////////////////////////////////////////
@@ -94,6 +93,15 @@ constexpr std::array<uint8_t, sizeof(T)> toLittleEndian(T value) {
         out[i] = static_cast<uint8_t>((value >> (8 * i)) & 0xFF);
     }
     return out;
+}
+
+template<typename T, std::size_t N, std::size_t M>
+void writeAtOffset(const std::array<T, N>& src, std::size_t offset, std::array<T, M>& dest) {
+    if (offset + N > M) {
+        throw std::out_of_range("write_at_offset: write would exceed destination size");
+    }
+
+    std::copy(src.begin(), src.end(), dest.begin() + offset);
 }
 
 

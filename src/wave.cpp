@@ -137,58 +137,6 @@ double squareWave(double timeSeconds, double frequency) {
     }
 }
 
-
-// 
-void createHeader2(IBuffer &buffer, std::uint16_t numChannels, std::uint32_t sampleRate, std::uint16_t bitsPerSample, size_t samplesSize) {
-    const static std::size_t offsetChunkId = 0;
-    const static std::size_t offsetChunkSize = 4;
-    const static std::size_t offsetFormat = 8;
-    const static std::size_t offsetSubchunk1Id = 12;
-    const static std::size_t offsetSubchunk1Size = 16;
-    const static std::size_t offsetAudioFormat = 20;
-    const static std::size_t offsetNumChannels = 22;
-    const static std::size_t offsetSampleRate = 24;
-    const static std::size_t offsetByteRate = 28;
-    const static std::size_t offsetBlockAlign = 32;
-    const static std::size_t offsetBitsPerSample = 34;
-    const static std::size_t offsetSubchunk2Id = 36;
-    const static std::size_t offsetSubchunk2Size = 40;
-    // const static std::size_t offsetData = 44;
-
-    const static constexpr std::array<std::uint8_t, 4> chunkId = {'R', 'I', 'F', 'F'};
-    const static constexpr std::array<std::uint8_t, 4> format = {'W', 'A', 'V', 'E'};
-    const static constexpr std::array<std::uint8_t, 4> subchunk1Id = {'f', 'm', 't', ' '};
-    const static constexpr std::array<std::uint8_t, 4> subchunk1Size = toLittleEndian<std::uint32_t>(16);
-    const static constexpr std::array<std::uint8_t, 2> audioFormat = toLittleEndian<std::uint16_t>(1);
-    const static constexpr std::array<std::uint8_t, 4> subchunk2Id = {'d', 'a', 't', 'a'};
-
-    std::array<std::uint8_t, 4> chunkSize = toLittleEndian<std::uint32_t>(36 + samplesSize);
-    std::array<std::uint8_t, 4> byteRate = toLittleEndian<std::uint32_t>(sampleRate * numChannels * bitsPerSample / 8);
-    std::array<std::uint8_t, 2> blockAlign = toLittleEndian<std::uint16_t>(numChannels * bitsPerSample / 8);
-    std::array<std::uint8_t, 4> subchunk2Size = toLittleEndian<std::uint32_t>(samplesSize);
-
-    std::array<std::uint8_t, 44> bytes;
-
-
-    // TODO: should this take a writer as an argument insteado of writing to a buffer?
-    buffer.write(chunkId, chunkId.size());
-    // writeHelper(chunkId, offsetChunkId, bytes);
-    // writeHelper(chunkSize, offsetChunkSize, bytes);
-    // writeHelper(format, offsetFormat, bytes);
-    // writeHelper(subchunk1Id, offsetSubchunk1Id, bytes);
-    // writeHelper(subchunk1Size, offsetSubchunk1Size, bytes);
-    // writeHelper(audioFormat, offsetAudioFormat, bytes);
-    // writeHelper(toLittleEndian<std::uint16_t>(numChannels), offsetNumChannels, bytes);
-    // writeHelper(toLittleEndian<std::uint32_t>(sampleRate), offsetSampleRate, bytes);
-    // writeHelper(byteRate, offsetByteRate, bytes);
-    // writeHelper(blockAlign, offsetBlockAlign, bytes);
-    // writeHelper(toLittleEndian<std::uint16_t>(bitsPerSample), offsetBitsPerSample, bytes);
-    // writeHelper(subchunk2Id, offsetSubchunk2Id, bytes);
-    // writeHelper(subchunk2Size, offsetSubchunk2Size, bytes);
-
-    // return bytes;
-}
-
 std::array<std::uint8_t, 44> createHeader(std::uint16_t numChannels, std::uint32_t sampleRate, std::uint16_t bitsPerSample, size_t samplesSize) {
     const static std::size_t offsetChunkId = 0;
     const static std::size_t offsetChunkSize = 4;
@@ -219,27 +167,27 @@ std::array<std::uint8_t, 44> createHeader(std::uint16_t numChannels, std::uint32
 
     std::array<std::uint8_t, 44> bytes;
 
-    auto writeHelper = [](const std::span<const std::uint8_t> &value, std::size_t offset, std::span<std::uint8_t> bytes) {
-        if (offset + value.size() > bytes.size()) {
-            throw std::out_of_range("writeHelper would write past end of buffer");
-        }
-        std::copy(value.begin(), value.end(), bytes.begin() + offset);
-    };
+    // auto writeHelper = [](const std::span<const std::uint8_t> &value, std::size_t offset, std::span<std::uint8_t> bytes) {
+    //     if (offset + value.size() > bytes.size()) {
+    //         throw std::out_of_range("writeHelper would write past end of buffer");
+    //     }
+    //     std::copy(value.begin(), value.end(), bytes.begin() + offset);
+    // };
 
     // TODO: should this take a writer as an argument insteado of writing to a buffer?
-    writeHelper(chunkId, offsetChunkId, bytes);
-    writeHelper(chunkSize, offsetChunkSize, bytes);
-    writeHelper(format, offsetFormat, bytes);
-    writeHelper(subchunk1Id, offsetSubchunk1Id, bytes);
-    writeHelper(subchunk1Size, offsetSubchunk1Size, bytes);
-    writeHelper(audioFormat, offsetAudioFormat, bytes);
-    writeHelper(toLittleEndian<std::uint16_t>(numChannels), offsetNumChannels, bytes);
-    writeHelper(toLittleEndian<std::uint32_t>(sampleRate), offsetSampleRate, bytes);
-    writeHelper(byteRate, offsetByteRate, bytes);
-    writeHelper(blockAlign, offsetBlockAlign, bytes);
-    writeHelper(toLittleEndian<std::uint16_t>(bitsPerSample), offsetBitsPerSample, bytes);
-    writeHelper(subchunk2Id, offsetSubchunk2Id, bytes);
-    writeHelper(subchunk2Size, offsetSubchunk2Size, bytes);
+    writeAtOffset(chunkId, offsetChunkId, bytes);
+    writeAtOffset(chunkSize, offsetChunkSize, bytes);
+    writeAtOffset(format, offsetFormat, bytes);
+    writeAtOffset(subchunk1Id, offsetSubchunk1Id, bytes);
+    writeAtOffset(subchunk1Size, offsetSubchunk1Size, bytes);
+    writeAtOffset(audioFormat, offsetAudioFormat, bytes);
+    writeAtOffset(toLittleEndian<std::uint16_t>(numChannels), offsetNumChannels, bytes);
+    writeAtOffset(toLittleEndian<std::uint32_t>(sampleRate), offsetSampleRate, bytes);
+    writeAtOffset(byteRate, offsetByteRate, bytes);
+    writeAtOffset(blockAlign, offsetBlockAlign, bytes);
+    writeAtOffset(toLittleEndian<std::uint16_t>(bitsPerSample), offsetBitsPerSample, bytes);
+    writeAtOffset(subchunk2Id, offsetSubchunk2Id, bytes);
+    writeAtOffset(subchunk2Size, offsetSubchunk2Size, bytes);
 
     return bytes;
 }
