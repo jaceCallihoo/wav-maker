@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic
+CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -MMD -MP
 CPPFLAGS := -Iinclude
 
 SRC_DIR   := src
@@ -27,3 +27,5 @@ run: $(TARGET)
 
 clean:
 	rm -rf $(BUILD_DIR)/*
+
+-include $(OBJS:.o=.d)

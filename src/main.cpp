@@ -14,6 +14,7 @@
 #include <memory>
 
 #include "wave.hpp"
+#include "json.hpp"
 
 #define assertm(exp, msg) assert((void(msg), exp))
 
@@ -22,23 +23,6 @@
 // TODO: shoulde the function names be camel case? Check google formatting standards
 // TODO: check the class field names as well
 
-
-// bitsPerSample: how many bits are used to record a sample (not important until later when writing)
-// apmlitude: distance of the wave sample from 0 (also not super important to the calc)
-
-// sampleRate: how many samples of the wave are there in a seccond
-// frequency: number of sound wave cycels per second
-//      1Hz = 1 cycle per second
-// wavelength: 
-// waves per second? -> how many waves have been before this point?
-//      frequency 
-
-// i: the current sample
-// double(i) / sampleRate: position within the second ... is this even useful? don't we want position within the wave?
-//      maybe this is useful when combined with frequency
-// period: 1 / frequency
-
-// TODO: can this returen an array somehow instead of a vector?
 // TODO: make a generator version of this function
 // TODO: make a stateless version of this function that gets a saple at a given index
 
@@ -151,7 +135,7 @@ int main() {
         return 1;
     }
 
-    std::array header = createHeader(numChannels, sampleRate, bitsPerSample, sampleRate * bytesPerSample);
+    std::array header = createHeader(numChannels, sampleRate, bitsPerSample, numSamples * bytesPerSample);
     // const int UP = 1;
     // const int DOWN = 2;
 

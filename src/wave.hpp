@@ -20,7 +20,8 @@ class Frequency {
 public:
     // Do I even need this?
     // virtual ~Frequency() = default;
-    virtual double f(double percent) = 0;
+    virtual double f(double percent) = 0; // integral
+    virtual double g(double percent) = 0; // interpolate
 };
 
 
@@ -30,8 +31,12 @@ class Linear: public Frequency {
     double interpolate(double samplePercent, const std::vector<Keyframe> &keyframes);
 public:
     Linear(std::vector<Keyframe> keyframes): keyframes{keyframes} {}
-    virtual double f(double percent) {
+    double f(double percent) {
         return cumulativeIntegral(keyframes, percent);
+    };
+    double g(double percent) {
+        // TODO: reorder the args so they're the same as the other one 
+        return interpolate(percent, keyframes);
     };
 };
 
@@ -39,7 +44,10 @@ class Constant: public Frequency {
     double value;
 public:
     Constant(double value): value{value} {}
-    virtual double f(double) {
+    double f(double) {
+        return value;
+    }
+    double g(double) {
         return value;
     }
 };

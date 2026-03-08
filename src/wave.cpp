@@ -5,6 +5,9 @@
 // TODO: remove
 #include <span>
 
+#include <iostream>
+#include <format>
+
 // Linear /////////////////////////////////////////////////////////////////////
 
 double Linear::cumulativeIntegral(const std::vector<Keyframe> &keyframes, double percent) {
@@ -203,8 +206,6 @@ double combine(const std::vector<Sound*> &sounds, size_t sampleIndex) {
         const auto& frequency = sound->frequency;
         const auto& amplitude = sound->amplitude;
 
-        // const auto& linearTransformKeyframes = sound->linearTransformKeyframes;
-
         if (sampleIndex < delaySamples) {
             continue;
         }
@@ -214,18 +215,11 @@ double combine(const std::vector<Sound*> &sounds, size_t sampleIndex) {
         }
 
         const double timeSeconds = double(sampleIndex) / sampleRate;
-        const double percent = double(sampleIndex - delaySamples) / numSamples;
+        const double activeSamplePercent = double(sampleIndex - delaySamples) / numSamples;
 
-        double current = function(timeSeconds, frequency->f(percent));
+        double current = function(timeSeconds, frequency->f(activeSamplePercent));
 
-        // const double activeSamplePercent = double(sampleIndex - delaySamples) / numSamples;
-
-        // if (linearTransformKeyframes.size() > 0) {
-        //     combined *= transformLinear(activeSamplePercent, linearTransformKeyframes);
-        // }
-
-        // TODO: this is wrong
-        current *= amplitude->f(percent);
+        current *= amplitude->g(activeSamplePercent);
 
         combined += current;
     }
