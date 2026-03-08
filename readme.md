@@ -2,6 +2,41 @@
 
 A C++20 audio synthesizer that generates WAV files from programmatically defined waveforms. Audio is produced through a streaming pipeline — samples are computed on demand and written in fixed-size chunks, keeping memory usage constant regardless of output duration.
 
+## Demos
+```
+Headphone Warning
+```
+
+### Constant Waves
+
+#### Sin Wave 440hz
+https://github.com/user-attachments/assets/9b040c27-f6b2-4277-b0f9-d5acd06efa09
+
+#### Square Wave 440hz
+https://github.com/user-attachments/assets/1170990d-4e6e-4799-9a3a-b60f9bcf8267
+
+### Triangle Wave 440hz
+https://github.com/user-attachments/assets/f66e8c35-5ffd-4910-ba98-0b7b540222d8
+
+#### Sawtooth Wave 440hz
+https://github.com/user-attachments/assets/6aa29b20-d7c6-474b-95e9-c7f5112e4c4d
+
+### Linear Amplitude Transforms
+#### Sin Wave Ease In 110hz
+https://github.com/user-attachments/assets/c7d67b9a-8851-4240-9508-7195f8c98422
+
+#### Triangle Wave Ease In Out 220hz
+https://github.com/user-attachments/assets/187174e0-7f07-4485-8450-66090c6a0713
+
+### Lineare Frequency Transforms
+#### Square Wave 440hz to 880hz
+https://github.com/user-attachments/assets/6c562edc-668f-443c-867c-8b151b072e42
+
+### Combined
+### Sin Wave x3, Ease In Out, 110hz to 220hz, 220hz to 440hz, 440hz to 880hz 
+https://github.com/user-attachments/assets/0ea03731-be17-4ef1-9b68-67cbb083f5c2
+
+
 ## Features
 
 - **Four waveform types** — sine, square, sawtooth, and triangle
